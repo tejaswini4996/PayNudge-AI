@@ -1,4 +1,4 @@
-﻿
+
 import React, { useEffect, useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import './style.css'
@@ -14,21 +14,27 @@ interface Invoice {
   status: string
 }
 
-function App() {
-  const [invoices, setInvoices] = useState<Invoice[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [showForm, setShowForm] = useState(false)
-const [reminder, setReminder] = useState<{
+interface Reminder {
   invoice_id: number
   customer_email: string
   subject: string
   message: string
   tone: string
   ai_generated: boolean
-} | null>(null)
+}
 
-const [reminderLoading, setReminderLoading] = useState<number | null>(null)
+// Uses the same Vercel domain for backend API requests.
+const API_URL = import.meta.env.VITE_API_BASE_URL || ''
+
+function App() {
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [showForm, setShowForm] = useState(false)
+  const [reminder, setReminder] = useState<Reminder | null>(null)
+  const [reminderLoading, setReminderLoading] = useState<number | null>(null)
+
   const [form, setForm] = useState({
     customer_name: '',
     customer_email: '',
@@ -39,14 +45,20 @@ const [reminderLoading, setReminderLoading] = useState<number | null>(null)
   })
 
   const fetchInvoices = async () => {
+    setLoading(true)
+
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/invoices')
-      if (!response.ok) throw new Error('Failed to fetch invoices')
+      const response = await fetch(`${API_URL}/api/invoices`)
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch invoices')
+      }
+
       const data: Invoice[] = await response.json()
       setInvoices(data)
       setError('')
     } catch {
-      setError('Unable to load invoices. Check your backend.')
+      setError('Unable to load invoices. Check your backend deployment.')
     } finally {
       setLoading(false)
     }
@@ -62,7 +74,7 @@ const [reminderLoading, setReminderLoading] = useState<number | null>(null)
     setError('')
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/invoices', {
+      const response = await fetch(`${API_URL}/api/invoices`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -74,8 +86,7 @@ const [reminderLoading, setReminderLoading] = useState<number | null>(null)
       })
 
       if (!response.ok) {
-        const message = await response.text()
-        throw new Error(message || 'Could not create invoice')
+        throw new Error(await response.text() || 'Could not create invoice')
       }
 
       const newInvoice: Invoice = await response.json()
@@ -105,7 +116,7 @@ const [reminderLoading, setReminderLoading] = useState<number | null>(null)
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/invoices/${invoiceId}/reminder`,
+        `${API_URL}/api/invoices/${invoiceId}/reminder`,
         { method: 'POST' },
       )
 
@@ -113,7 +124,7 @@ const [reminderLoading, setReminderLoading] = useState<number | null>(null)
         throw new Error('Failed to generate reminder')
       }
 
-      const data = await response.json()
+      const data: Reminder = await response.json()
       setReminder(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Reminder generation failed')
@@ -121,8 +132,15 @@ const [reminderLoading, setReminderLoading] = useState<number | null>(null)
       setReminderLoading(null)
     }
   }
-  const paid = invoices.filter((invoice) => invoice.status.toLowerCase() === 'paid')
-  const pending = invoices.filter((invoice) => invoice.status.toLowerCase() === 'pending')
+
+  const paid = invoices.filter(
+    (invoice) => invoice.status.toLowerCase() === 'paid',
+  )
+
+  const pending = invoices.filter(
+    (invoice) => invoice.status.toLowerCase() === 'pending',
+  )
+
   const overdue = pending.filter(
     (invoice) => new Date(invoice.due_date) < new Date(new Date().toDateString()),
   )
@@ -134,13 +152,15 @@ const [reminderLoading, setReminderLoading] = useState<number | null>(null)
     <div className="dashboard">
       <aside className="sidebar">
         <h2 className="logo">PayNudge<span> AI</span></h2>
+
         <nav>
-  <a className="active">Dashboard</a>
-  <a>Invoices</a>
-  <a>Payment Collection</a>
-  <a>Reminders</a>
-  <a>Settings</a>
-</nav>
+          <a className="active">Dashboard</a>
+          <a>Invoices</a>
+          <a>Payment Collection</a>
+          <a>Reminders</a>
+          <a>Settings</a>
+        </nav>
+
         <div className="sidebar-bottom">
           <p>Smart collections powered by AI</p>
         </div>
@@ -152,6 +172,7 @@ const [reminderLoading, setReminderLoading] = useState<number | null>(null)
             <h1>Dashboard</h1>
             <p>Welcome back! Here's your collection overview.</p>
           </div>
+
           <button
             className="primary-button"
             onClick={() => setShowForm(true)}
@@ -168,16 +189,19 @@ const [reminderLoading, setReminderLoading] = useState<number | null>(null)
             <h2>{loading ? '...' : invoices.length}</h2>
             <span>All invoices</span>
           </div>
+
           <div className="stat-card">
             <p>Collected</p>
             <h2>{loading ? '...' : `${totalAmount(paid).toFixed(2)} USD`}</h2>
             <span>{paid.length} paid invoices</span>
           </div>
+
           <div className="stat-card">
             <p>Pending</p>
             <h2>{loading ? '...' : `${totalAmount(pending).toFixed(2)} USD`}</h2>
             <span>{pending.length} awaiting payment</span>
           </div>
+
           <div className="stat-card">
             <p>Overdue</p>
             <h2>{loading ? '...' : overdue.length}</h2>
@@ -191,6 +215,7 @@ const [reminderLoading, setReminderLoading] = useState<number | null>(null)
               <h2>Recent Invoices</h2>
               <p>Live data from your PostgreSQL database.</p>
             </div>
+
             <button className="secondary-button" onClick={fetchInvoices}>
               Refresh
             </button>
@@ -212,6 +237,7 @@ const [reminderLoading, setReminderLoading] = useState<number | null>(null)
                     <th>AI Reminder</th>
                   </tr>
                 </thead>
+
                 <tbody>
                   {invoices.map((invoice) => (
                     <tr key={invoice.id}>
@@ -228,20 +254,23 @@ const [reminderLoading, setReminderLoading] = useState<number | null>(null)
                         <span className={`status ${invoice.status.toLowerCase()}`}>
                           {invoice.status}
                         </span>
-                                            </td>
+                      </td>
                       <td>
                         <button
                           className="secondary-button"
                           onClick={() => generateReminder(invoice.id)}
                           disabled={reminderLoading === invoice.id}
                         >
-                          {reminderLoading === invoice.id ? 'Generating...' : 'Generate'}
+                          {reminderLoading === invoice.id
+                            ? 'Generating...'
+                            : 'Generate'}
                         </button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+
               {invoices.length === 0 && <p>No invoices found.</p>}
             </div>
           )}
@@ -261,16 +290,22 @@ const [reminderLoading, setReminderLoading] = useState<number | null>(null)
                 ×
               </button>
             </div>
+
             <p><strong>To:</strong> {reminder.customer_email}</p>
             <p><strong>Subject:</strong> {reminder.subject}</p>
             <p><strong>Tone:</strong> {reminder.tone}</p>
-            <p><strong>AI Generated:</strong> {reminder.ai_generated ? 'Yes' : 'No'}</p>
+            <p>
+              <strong>AI Generated:</strong>{' '}
+              {reminder.ai_generated ? 'Yes' : 'No'}
+            </p>
+
             <div className="reminder-message">
               {reminder.message}
             </div>
           </div>
         </div>
       )}
+
       {showForm && (
         <div className="modal-overlay">
           <div className="invoice-modal">
@@ -281,7 +316,7 @@ const [reminderLoading, setReminderLoading] = useState<number | null>(null)
                 className="close-button"
                 onClick={() => setShowForm(false)}
               >
-               
+                ×
               </button>
             </div>
 
@@ -290,7 +325,9 @@ const [reminderLoading, setReminderLoading] = useState<number | null>(null)
               <input
                 required
                 value={form.customer_name}
-                onChange={(e) => setForm({ ...form, customer_name: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, customer_name: e.target.value })
+                }
                 placeholder="Enter customer name"
               />
 
@@ -299,7 +336,9 @@ const [reminderLoading, setReminderLoading] = useState<number | null>(null)
                 required
                 type="email"
                 value={form.customer_email}
-                onChange={(e) => setForm({ ...form, customer_email: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, customer_email: e.target.value })
+                }
                 placeholder="customer@example.com"
               />
 
@@ -307,7 +346,9 @@ const [reminderLoading, setReminderLoading] = useState<number | null>(null)
               <input
                 required
                 value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, description: e.target.value })
+                }
                 placeholder="Enter invoice description"
               />
 
@@ -318,14 +359,18 @@ const [reminderLoading, setReminderLoading] = useState<number | null>(null)
                 min="0.01"
                 step="0.01"
                 value={form.amount}
-                onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, amount: e.target.value })
+                }
                 placeholder="Enter amount"
               />
 
               <label>Currency</label>
               <select
                 value={form.currency}
-                onChange={(e) => setForm({ ...form, currency: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, currency: e.target.value })
+                }
               >
                 <option value="USD">USD</option>
                 <option value="EUR">EUR</option>
@@ -337,10 +382,16 @@ const [reminderLoading, setReminderLoading] = useState<number | null>(null)
                 required
                 type="date"
                 value={form.due_date}
-                onChange={(e) => setForm({ ...form, due_date: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, due_date: e.target.value })
+                }
               />
 
-              <button className="primary-button save-button" type="submit" disabled={saving}>
+              <button
+                className="primary-button save-button"
+                type="submit"
+                disabled={saving}
+              >
                 {saving ? 'Saving...' : 'Save Invoice'}
               </button>
             </form>
