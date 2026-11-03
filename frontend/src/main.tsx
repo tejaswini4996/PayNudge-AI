@@ -135,12 +135,12 @@ const [reminderLoading, setReminderLoading] = useState<number | null>(null)
       <aside className="sidebar">
         <h2 className="logo">PayNudge<span> AI</span></h2>
         <nav>
-          <a className="active">ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â¦ Dashboard</a>
-          <a>ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â¤ Invoices</a>
-          <a>ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â€ Payment Collection</a>
-          <a>ÃƒÂ¢Ã¢â‚¬â€Ã‚Â· Reminders</a>
-          <a>ÃƒÂ¢Ã…Â¡Ã¢â€žÂ¢ Settings</a>
-        </nav>
+  <a className="active">Dashboard</a>
+  <a>Invoices</a>
+  <a>Payment Collection</a>
+  <a>Reminders</a>
+  <a>Settings</a>
+</nav>
         <div className="sidebar-bottom">
           <p>Smart collections powered by AI</p>
         </div>
