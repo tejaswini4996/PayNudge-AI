@@ -341,3 +341,88 @@ td small {
   margin: 15px 0;
   font-size: 13px;
 }
+
+/* Functional sidebar navigation */
+.sidebar nav button {
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: #b8bfd3;
+  text-align: left;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.sidebar nav button:hover,
+.sidebar nav button.active {
+  background: #343b63;
+  color: white;
+}
+
+.empty-message {
+  padding: 25px 0;
+  color: #858da1;
+  font-size: 14px;
+}
+
+.page-loading {
+  margin-top: 30px;
+  color: #858da1;
+}
+
+.settings-section > p {
+  color: #858da1;
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+.settings-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 0;
+  border-bottom: 1px solid #edf0f5;
+  font-size: 14px;
+}
+
+.settings-item span {
+  color: #858da1;
+  text-align: right;
+}
+
+.settings-note {
+  margin-top: 25px !important;
+  line-height: 1.6;
+}
+
+.reminder-message {
+  margin-top: 20px;
+  padding: 18px;
+  border-radius: 10px;
+  background: #f5f7fb;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 650px) {
+  .sidebar nav {
+    gap: 5px;
+  }
+
+  .sidebar nav button {
+    padding: 11px;
+  }
+
+  .settings-item {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .settings-item span {
+    text-align: left;
+  }
+}

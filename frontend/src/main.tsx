@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import './style.css'
@@ -23,7 +22,13 @@ interface Reminder {
   ai_generated: boolean
 }
 
-// Uses the same Vercel domain for backend API requests.
+type Page =
+  | 'Dashboard'
+  | 'Invoices'
+  | 'Payment Collection'
+  | 'Reminders'
+  | 'Settings'
+
 const API_URL = import.meta.env.VITE_API_BASE_URL || ''
 
 function App() {
@@ -34,6 +39,7 @@ function App() {
   const [showForm, setShowForm] = useState(false)
   const [reminder, setReminder] = useState<Reminder | null>(null)
   const [reminderLoading, setReminderLoading] = useState<number | null>(null)
+  const [activePage, setActivePage] = useState<Page>('Dashboard')
 
   const [form, setForm] = useState({
     customer_name: '',
@@ -142,23 +148,116 @@ function App() {
   )
 
   const overdue = pending.filter(
-    (invoice) => new Date(invoice.due_date) < new Date(new Date().toDateString()),
+    (invoice) =>
+      new Date(invoice.due_date) < new Date(new Date().toDateString()),
   )
 
   const totalAmount = (items: Invoice[]) =>
-    items.reduce((sum, invoice) => sum + invoice.amount, 0)
+    items.reduce((sum, invoice) => sum + Number(invoice.amount || 0), 0)
+
+  const renderInvoiceTable = (
+    items: Invoice[],
+    showReminderButton = false,
+  ) => (
+    <div className="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Invoice</th>
+            <th>Customer</th>
+            <th>Description</th>
+            <th>Amount</th>
+            <th>Due Date</th>
+            <th>Status</th>
+            {showReminderButton && <th>AI Reminder</th>}
+          </tr>
+        </thead>
+
+        <tbody>
+          {items.map((invoice) => (
+            <tr key={invoice.id}>
+              <td>#{invoice.id}</td>
+              <td>
+                <strong>{invoice.customer_name}</strong>
+                <br />
+                <small>{invoice.customer_email}</small>
+              </td>
+              <td>{invoice.description}</td>
+              <td>
+                {invoice.currency} {Number(invoice.amount).toFixed(2)}
+              </td>
+              <td>{invoice.due_date}</td>
+              <td>
+                <span className={`status ${invoice.status.toLowerCase()}`}>
+                  {invoice.status}
+                </span>
+              </td>
+
+              {showReminderButton && (
+                <td>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => generateReminder(invoice.id)}
+                    disabled={
+                      reminderLoading === invoice.id ||
+                      invoice.status.toLowerCase() === 'paid'
+                    }
+                  >
+                    {reminderLoading === invoice.id
+                      ? 'Generating...'
+                      : 'Generate'}
+                  </button>
+                </td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {items.length === 0 && (
+        <p className="empty-message">No invoices found.</p>
+      )}
+    </div>
+  )
+
+  const pageDescriptions: Record<Page, string> = {
+    Dashboard: "Welcome back! Here's your collection overview.",
+    Invoices: 'View and manage all your invoices.',
+    'Payment Collection': 'Track paid and outstanding payments.',
+    Reminders: 'Generate AI-powered payment reminders.',
+    Settings: 'Application and integration information.',
+  }
 
   return (
     <div className="dashboard">
       <aside className="sidebar">
-        <h2 className="logo">PayNudge<span> AI</span></h2>
+        <h2 className="logo">
+          PayNudge<span> AI</span>
+        </h2>
 
         <nav>
-          <a className="active">Dashboard</a>
-          <a>Invoices</a>
-          <a>Payment Collection</a>
-          <a>Reminders</a>
-          <a>Settings</a>
+          {(
+            [
+              'Dashboard',
+              'Invoices',
+              'Payment Collection',
+              'Reminders',
+              'Settings',
+            ] as Page[]
+          ).map((page) => (
+            <button
+              key={page}
+              type="button"
+              className={activePage === page ? 'active' : ''}
+              onClick={() => {
+                setActivePage(page)
+                setError('')
+              }}
+            >
+              {page}
+            </button>
+          ))}
         </nav>
 
         <div className="sidebar-bottom">
@@ -169,112 +268,197 @@ function App() {
       <main className="main-content">
         <header className="topbar">
           <div>
-            <h1>Dashboard</h1>
-            <p>Welcome back! Here's your collection overview.</p>
+            <h1>{activePage}</h1>
+            <p>{pageDescriptions[activePage]}</p>
           </div>
 
-          <button
-            className="primary-button"
-            onClick={() => setShowForm(true)}
-          >
-            + Create Invoice
-          </button>
+          {(activePage === 'Dashboard' || activePage === 'Invoices') && (
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => setShowForm(true)}
+            >
+              + Create Invoice
+            </button>
+          )}
         </header>
 
         {error && <p className="error-message">{error}</p>}
 
-        <section className="stats">
-          <div className="stat-card">
-            <p>Total Invoices</p>
-            <h2>{loading ? '...' : invoices.length}</h2>
-            <span>All invoices</span>
-          </div>
+        {loading ? (
+          <p className="page-loading">Loading invoices...</p>
+        ) : (
+          <>
+            {activePage === 'Dashboard' && (
+              <>
+                <section className="stats">
+                  <div className="stat-card">
+                    <p>Total Invoices</p>
+                    <h2>{invoices.length}</h2>
+                    <span>All invoices</span>
+                  </div>
 
-          <div className="stat-card">
-            <p>Collected</p>
-            <h2>{loading ? '...' : `${totalAmount(paid).toFixed(2)} USD`}</h2>
-            <span>{paid.length} paid invoices</span>
-          </div>
+                  <div className="stat-card">
+                    <p>Collected</p>
+                    <h2>{totalAmount(paid).toFixed(2)} USD</h2>
+                    <span>{paid.length} paid invoices</span>
+                  </div>
 
-          <div className="stat-card">
-            <p>Pending</p>
-            <h2>{loading ? '...' : `${totalAmount(pending).toFixed(2)} USD`}</h2>
-            <span>{pending.length} awaiting payment</span>
-          </div>
+                  <div className="stat-card">
+                    <p>Pending</p>
+                    <h2>{totalAmount(pending).toFixed(2)} USD</h2>
+                    <span>{pending.length} awaiting payment</span>
+                  </div>
 
-          <div className="stat-card">
-            <p>Overdue</p>
-            <h2>{loading ? '...' : overdue.length}</h2>
-            <span>Past due invoices</span>
-          </div>
-        </section>
+                  <div className="stat-card">
+                    <p>Overdue</p>
+                    <h2>{overdue.length}</h2>
+                    <span>Past due invoices</span>
+                  </div>
+                </section>
 
-        <section className="invoice-section">
-          <div className="section-heading">
-            <div>
-              <h2>Recent Invoices</h2>
-              <p>Live data from your PostgreSQL database.</p>
-            </div>
+                <section className="invoice-section">
+                  <div className="section-heading">
+                    <div>
+                      <h2>Recent Invoices</h2>
+                      <p>Live data from your PostgreSQL database.</p>
+                    </div>
 
-            <button className="secondary-button" onClick={fetchInvoices}>
-              Refresh
-            </button>
-          </div>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={fetchInvoices}
+                    >
+                      Refresh
+                    </button>
+                  </div>
 
-          {loading && <p>Loading invoices...</p>}
+                  {renderInvoiceTable(invoices.slice(0, 5))}
+                </section>
+              </>
+            )}
 
-          {!loading && (
-            <div className="table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Invoice</th>
-                    <th>Customer</th>
-                    <th>Description</th>
-                    <th>Amount</th>
-                    <th>Due Date</th>
-                    <th>Status</th>
-                    <th>AI Reminder</th>
-                  </tr>
-                </thead>
+            {activePage === 'Invoices' && (
+              <section className="invoice-section">
+                <div className="section-heading">
+                  <div>
+                    <h2>All Invoices</h2>
+                    <p>{invoices.length} invoices in your database.</p>
+                  </div>
 
-                <tbody>
-                  {invoices.map((invoice) => (
-                    <tr key={invoice.id}>
-                      <td>#{invoice.id}</td>
-                      <td>
-                        <strong>{invoice.customer_name}</strong>
-                        <br />
-                        <small>{invoice.customer_email}</small>
-                      </td>
-                      <td>{invoice.description}</td>
-                      <td>{invoice.currency} {invoice.amount.toFixed(2)}</td>
-                      <td>{invoice.due_date}</td>
-                      <td>
-                        <span className={`status ${invoice.status.toLowerCase()}`}>
-                          {invoice.status}
-                        </span>
-                      </td>
-                      <td>
-                        <button
-                          className="secondary-button"
-                          onClick={() => generateReminder(invoice.id)}
-                          disabled={reminderLoading === invoice.id}
-                        >
-                          {reminderLoading === invoice.id
-                            ? 'Generating...'
-                            : 'Generate'}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={fetchInvoices}
+                  >
+                    Refresh
+                  </button>
+                </div>
 
-              {invoices.length === 0 && <p>No invoices found.</p>}
-            </div>
-          )}
-        </section>
+                {renderInvoiceTable(invoices, true)}
+              </section>
+            )}
+
+            {activePage === 'Payment Collection' && (
+              <>
+                <section className="stats">
+                  <div className="stat-card">
+                    <p>Total Collected</p>
+                    <h2>{totalAmount(paid).toFixed(2)} USD</h2>
+                    <span>{paid.length} paid invoices</span>
+                  </div>
+
+                  <div className="stat-card">
+                    <p>Outstanding</p>
+                    <h2>{totalAmount(pending).toFixed(2)} USD</h2>
+                    <span>{pending.length} pending invoices</span>
+                  </div>
+
+                  <div className="stat-card">
+                    <p>Overdue</p>
+                    <h2>{overdue.length}</h2>
+                    <span>Past due invoices</span>
+                  </div>
+
+                  <div className="stat-card">
+                    <p>Collection Rate</p>
+                    <h2>
+                      {invoices.length
+                        ? `${((paid.length / invoices.length) * 100).toFixed(1)}%`
+                        : '0%'}
+                    </h2>
+                    <span>By invoice count</span>
+                  </div>
+                </section>
+
+                <section className="invoice-section">
+                  <div className="section-heading">
+                    <div>
+                      <h2>Payment Records</h2>
+                      <p>Paid and outstanding invoice records.</p>
+                    </div>
+                  </div>
+
+                  {renderInvoiceTable(invoices)}
+                </section>
+              </>
+            )}
+
+            {activePage === 'Reminders' && (
+              <section className="invoice-section">
+                <div className="section-heading">
+                  <div>
+                    <h2>Payment Reminders</h2>
+                    <p>
+                      Generate reminders for invoices that have not been paid.
+                    </p>
+                  </div>
+                </div>
+
+                {renderInvoiceTable(
+                  invoices.filter(
+                    (invoice) => invoice.status.toLowerCase() !== 'paid',
+                  ),
+                  true,
+                )}
+              </section>
+            )}
+
+            {activePage === 'Settings' && (
+              <section className="invoice-section settings-section">
+                <h2>Settings</h2>
+                <p>
+                  PayNudge AI application information and integration status.
+                </p>
+
+                <div className="settings-item">
+                  <strong>Application</strong>
+                  <span>PayNudge AI</span>
+                </div>
+
+                <div className="settings-item">
+                  <strong>Backend</strong>
+                  <span>FastAPI</span>
+                </div>
+
+                <div className="settings-item">
+                  <strong>Database</strong>
+                  <span>PostgreSQL (Neon)</span>
+                </div>
+
+                <div className="settings-item">
+                  <strong>AI reminders</strong>
+                  <span>Groq integration configured through environment variables</span>
+                </div>
+
+                <p className="settings-note">
+                  Secret keys and deployment settings are managed securely in
+                  your Vercel project environment variables.
+                </p>
+              </section>
+            )}
+          </>
+        )}
       </main>
 
       {reminder && (
